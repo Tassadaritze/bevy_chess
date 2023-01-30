@@ -1,0 +1,17 @@
+[package]
+name = "bevy_chess"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# TODO: NOTE: Remember to revert this before releasing your game! Otherwise you will need to include libbevy_dylib alongside your game if you want it to run. If you remove the "dynamic" feature, your game executable can run standalone.
+bevy = { version = "0.9", features = ["dynamic"] }
+bevy_ecs_tilemap = "0.9"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
