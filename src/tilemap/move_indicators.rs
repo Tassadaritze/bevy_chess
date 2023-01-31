@@ -27,8 +27,12 @@ impl FromWorld for TakeIndicatorHandle {
 }
 
 #[derive(Component)]
+pub struct SelectedTile;
+
+#[derive(Component)]
 pub struct MoveIndicator(Entity);
 
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_move_indicators(
     mut commands: Commands,
     move_indicator_handle: Res<MoveIndicatorHandle>,
@@ -38,20 +42,28 @@ pub fn spawn_move_indicators(
         (&TilemapGridSize, &TilemapType, &TileStorage, &Transform),
         With<board::BoardTilemap>,
     >,
-    tiles_q: Query<Entity, With<MoveIndicator>>,
+    tiles_w_indicator_q: Query<Entity, With<MoveIndicator>>,
+    tile_selected_q: Query<Entity, With<SelectedTile>>,
     indicator_q: Query<&MoveIndicator>,
 ) {
     for ev in click_ev.iter() {
-        for tile_entity in tiles_q.iter() {
+        for tile_entity in tiles_w_indicator_q.iter() {
             if let Ok(move_indicator) = indicator_q.get(tile_entity) {
                 commands.entity(move_indicator.0).despawn();
                 commands.entity(tile_entity).remove::<MoveIndicator>();
             }
         }
+        for tile_entity in tile_selected_q.iter() {
+            commands.entity(tile_entity).remove::<SelectedTile>();
+        }
 
         let (grid_size, map_type, tile_storage, map_transform) = tilemap_q.single();
 
-        if let Some(moves) = &ev.0 {
+        if let Some(tile_entity) = tile_storage.get(&ev.tile) {
+            commands.entity(tile_entity).insert(SelectedTile);
+        }
+
+        if let Some(moves) = &ev.moves {
             for _move in moves {
                 if let Some(tile_entity) = tile_storage.get(&_move.into()) {
                     let tile_center = <&Move as Into<TilePos>>::into(_move)

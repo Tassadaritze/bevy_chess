@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use crate::game::pieces::{ChessPiece, ChessPieceColour, ChessPieceKind};
 use crate::game::{Move, MoveFromTo};
 
-#[derive(Resource, Debug)]
+#[derive(Resource, Debug, Clone)]
 pub struct Board {
     pub(crate) board: Vec<Vec<Option<ChessPiece>>>,
     pub(crate) last_move: Option<MoveFromTo>,
@@ -89,7 +89,7 @@ impl Board {
         self.board[7 - y as usize][x as usize] = None;
     }
 
-    fn _move(&mut self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) {
+    pub fn _move(&mut self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) {
         if let Some(piece) = self.get(from_x, from_y) {
             let mut piece = *piece;
             if !piece.has_moved {
@@ -362,5 +362,5 @@ impl Board {
     }
 }
 
-#[derive(Resource)]
-struct BoardHistory(Vec<Board>);
+#[derive(Resource, Default)]
+pub struct BoardHistory(pub Vec<Board>);
