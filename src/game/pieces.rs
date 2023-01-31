@@ -900,9 +900,173 @@ mod tests {
         );
     }
 
-    // TODO: add castling
     #[test]
     fn king_castling() {
-        todo!()
+        let mut board = Board::new();
+        board.set(0, 0, ChessPieceColour::White, ChessPieceKind::Rook);
+        board.set(7, 0, ChessPieceColour::White, ChessPieceKind::Rook);
+        board.set(0, 7, ChessPieceColour::Black, ChessPieceKind::Rook);
+        board.set(7, 7, ChessPieceColour::Black, ChessPieceKind::Rook);
+
+        board.set(4, 0, ChessPieceColour::White, ChessPieceKind::King);
+        board.set(4, 7, ChessPieceColour::Black, ChessPieceKind::King);
+
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 3,
+                    y: 0,
+                    takes: false,
+                },
+                Move {
+                    x: 3,
+                    y: 1,
+                    takes: false,
+                },
+                Move {
+                    x: 4,
+                    y: 1,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 1,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 0,
+                    takes: false,
+                },
+                Move {
+                    x: 2,
+                    y: 0,
+                    takes: false,
+                },
+                Move {
+                    x: 6,
+                    y: 0,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(4, 0)
+        );
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 3,
+                    y: 7,
+                    takes: false,
+                },
+                Move {
+                    x: 3,
+                    y: 6,
+                    takes: false,
+                },
+                Move {
+                    x: 4,
+                    y: 6,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 6,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 7,
+                    takes: false,
+                },
+                Move {
+                    x: 2,
+                    y: 7,
+                    takes: false,
+                },
+                Move {
+                    x: 6,
+                    y: 7,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(4, 7)
+        );
+    }
+
+    #[test]
+    fn king_castling_obstructed() {
+        let mut board = Board::new();
+        board.set(0, 0, ChessPieceColour::White, ChessPieceKind::Rook);
+        board.set(7, 0, ChessPieceColour::White, ChessPieceKind::Rook);
+        board.set(1, 0, ChessPieceColour::White, ChessPieceKind::Knight);
+        board.set(6, 0, ChessPieceColour::White, ChessPieceKind::Knight);
+        board.set(0, 7, ChessPieceColour::Black, ChessPieceKind::Rook);
+        board.set(7, 7, ChessPieceColour::Black, ChessPieceKind::Rook);
+        board.set(1, 7, ChessPieceColour::Black, ChessPieceKind::Knight);
+        board.set(6, 7, ChessPieceColour::Black, ChessPieceKind::Knight);
+
+        board.set(4, 0, ChessPieceColour::White, ChessPieceKind::King);
+        board.set(4, 7, ChessPieceColour::Black, ChessPieceKind::King);
+
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 3,
+                    y: 0,
+                    takes: false,
+                },
+                Move {
+                    x: 3,
+                    y: 1,
+                    takes: false,
+                },
+                Move {
+                    x: 4,
+                    y: 1,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 1,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 0,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(4, 0)
+        );
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 3,
+                    y: 7,
+                    takes: false,
+                },
+                Move {
+                    x: 3,
+                    y: 6,
+                    takes: false,
+                },
+                Move {
+                    x: 4,
+                    y: 6,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 6,
+                    takes: false,
+                },
+                Move {
+                    x: 5,
+                    y: 7,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(4, 7)
+        );
     }
 }

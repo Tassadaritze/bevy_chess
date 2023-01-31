@@ -121,6 +121,8 @@ impl Board {
         };
         // a situation where we check if a pawn can move to y < 0 (or y > 7) should not happen
         let potential_y = y as i32 + y_offset;
+
+        // basic move + double move
         if let Some(_move) = self.can_do_move(x, potential_y as u32, colour) {
             if !_move.takes {
                 moves.insert(_move);
@@ -136,6 +138,7 @@ impl Board {
             }
         }
 
+        // taking + en passant
         for x_offset in [-1, 1] {
             let potential_x = x as i32 + x_offset;
             if let Some(_move) = self.can_do_move(potential_x as u32, potential_y as u32, colour) {
@@ -166,26 +169,6 @@ impl Board {
                 }
             }
         }
-        // for potential_x in x.saturating_sub(1)..=x + 1 {
-        //     let potential_tile = self.get(potential_x, potential_y);
-        //     if potential_x == x && potential_tile.is_none() {
-        //         moves.insert(Move {
-        //             x: potential_x,
-        //             y: potential_y,
-        //             takes: false,
-        //         });
-        //     } else if potential_x != x {
-        //         if let Some(val) = potential_tile {
-        //             if &val.colour != colour {
-        //                 moves.insert(Move {
-        //                     x: potential_x,
-        //                     y: potential_y,
-        //                     takes: true,
-        //                 });
-        //             }
-        //         }
-        //     }
-        // }
 
         moves
     }
@@ -291,9 +274,16 @@ impl Board {
         &self.get_rook_moves(x, y, colour) | &self.get_bishop_moves(x, y, colour)
     }
 
-    fn get_king_moves(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<Move> {
+    fn get_king_moves(
+        &self,
+        x: u32,
+        y: u32,
+        colour: &ChessPieceColour,
+        has_moved: bool,
+    ) -> HashSet<Move> {
         let mut moves = HashSet::new();
 
+        // basic moves
         for y_offset in -1..=1 {
             for x_offset in -1..=1 {
                 if x_offset == y_offset && x_offset == 0 {
@@ -309,6 +299,36 @@ impl Board {
             }
         }
 
+        // castling
+        if !has_moved {
+            'x_sides: for x_offset in [-1, 1] {
+                let mut potential_x = x as i32 + x_offset;
+                while let Some(_move) = self.can_do_move(potential_x as u32, y, colour) {
+                    if _move.takes {
+                        continue 'x_sides;
+                    }
+                    potential_x += x_offset;
+                }
+                if [0, 7].contains(&potential_x) {
+                    if let Some(piece) = self.get(potential_x as u32, y) {
+                        if let ChessPieceKind::Rook = piece.kind {
+                            // if we got this far without breaking the loop, then the chess piece
+                            // at x:0 or x:7 has to be the same colour
+                            // ...plus the king is in check anyway if the rook in that position
+                            // is the wrong colour
+                            if !piece.has_moved {
+                                moves.insert(Move {
+                                    x: (x as i32 + x_offset * 2) as u32,
+                                    y,
+                                    takes: false,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         moves
     }
 
@@ -319,7 +339,7 @@ impl Board {
             ChessPieceKind::Rook => self.get_rook_moves(x, y, &piece.colour),
             ChessPieceKind::Bishop => self.get_bishop_moves(x, y, &piece.colour),
             ChessPieceKind::Queen => self.get_queen_moves(x, y, &piece.colour),
-            ChessPieceKind::King => self.get_king_moves(x, y, &piece.colour),
+            ChessPieceKind::King => self.get_king_moves(x, y, &piece.colour, piece.has_moved),
         })
     }
 
