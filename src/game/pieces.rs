@@ -1,4 +1,4 @@
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum ChessPieceColour {
     White,
     Black,
@@ -14,7 +14,7 @@ pub enum ChessPieceKind {
     King,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ChessPiece {
     pub colour: ChessPieceColour,
     pub kind: ChessPieceKind,

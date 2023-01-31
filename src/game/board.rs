@@ -83,6 +83,18 @@ impl Board {
         self.0[7 - y as usize][x as usize] = None;
     }
 
+    fn _move(&mut self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) {
+        if let Some(piece) = self.get(from_x, from_y) {
+            self.set(to_x, to_y, piece.colour, piece.kind);
+            self.delete(from_x, from_y);
+        } else {
+            error!(
+                "tried to move an empty tile from {},{} to {},{}",
+                from_x, from_y, to_x, to_y
+            );
+        }
+    }
+
     fn get_pawn_moves(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<Move> {
         let mut moves = HashSet::new();
 
@@ -159,52 +171,31 @@ impl Board {
     }
 
     fn get_rook_moves(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<Move> {
+        const ROOK_MOVE_OFFSETS: [i32; 2] = [-1, 1];
+
         let mut moves = HashSet::new();
 
-        // TODO: maybe do this differently
-        for potential_x in (0..x).rev() {
-            if let Some(_move) = self.can_do_move(potential_x, y, colour) {
+        for x_offset in ROOK_MOVE_OFFSETS {
+            let mut potential_x = x as i32 + x_offset;
+            while let Some(_move) = self.can_do_move(potential_x as u32, y, colour) {
+                potential_x += x_offset;
                 let takes = _move.takes;
                 moves.insert(_move);
                 if takes {
                     break;
                 }
-            } else {
-                break;
-            }
-        }
-        for potential_x in x + 1..8 {
-            if let Some(_move) = self.can_do_move(potential_x, y, colour) {
-                let takes = _move.takes;
-                moves.insert(_move);
-                if takes {
-                    break;
-                }
-            } else {
-                break;
             }
         }
 
-        for potential_y in (0..y).rev() {
-            if let Some(_move) = self.can_do_move(x, potential_y, colour) {
+        for y_offset in ROOK_MOVE_OFFSETS {
+            let mut potential_y = y as i32 + y_offset;
+            while let Some(_move) = self.can_do_move(x, potential_y as u32, colour) {
+                potential_y += y_offset;
                 let takes = _move.takes;
                 moves.insert(_move);
                 if takes {
                     break;
                 }
-            } else {
-                break;
-            }
-        }
-        for potential_y in y + 1..8 {
-            if let Some(_move) = self.can_do_move(x, potential_y, colour) {
-                let takes = _move.takes;
-                moves.insert(_move);
-                if takes {
-                    break;
-                }
-            } else {
-                break;
             }
         }
 
