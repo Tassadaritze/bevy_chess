@@ -2,10 +2,13 @@ use bevy::prelude::*;
 use std::collections::HashSet;
 
 use crate::game::pieces::{ChessPiece, ChessPieceColour, ChessPieceKind};
-use crate::game::Move;
+use crate::game::{Move, MoveFromTo};
 
 #[derive(Resource, Debug)]
-pub struct Board(Vec<Vec<Option<ChessPiece>>>);
+pub struct Board {
+    pub(crate) board: Vec<Vec<Option<ChessPiece>>>,
+    pub(crate) last_move: Option<MoveFromTo>,
+}
 
 impl Default for Board {
     fn default() -> Self {
@@ -57,36 +60,44 @@ impl Default for Board {
 
 impl Board {
     pub fn new() -> Self {
-        Self(vec![
-            vec![None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None],
-        ])
+        Self {
+            board: vec![
+                vec![None, None, None, None, None, None, None, None],
+                vec![None, None, None, None, None, None, None, None],
+                vec![None, None, None, None, None, None, None, None],
+                vec![None, None, None, None, None, None, None, None],
+                vec![None, None, None, None, None, None, None, None],
+                vec![None, None, None, None, None, None, None, None],
+                vec![None, None, None, None, None, None, None, None],
+                vec![None, None, None, None, None, None, None, None],
+            ],
+            last_move: None,
+        }
     }
 
     pub fn get(&self, x: u32, y: u32) -> Option<&ChessPiece> {
-        self.0[7 - y as usize]
+        self.board[7 - y as usize]
             .get(x as usize)
             .and_then(|piece| piece.as_ref())
     }
 
     pub fn set(&mut self, x: u32, y: u32, colour: ChessPieceColour, kind: ChessPieceKind) {
-        self.0[7 - y as usize][x as usize] = Some(ChessPiece::new(colour, kind, x, y));
+        self.board[7 - y as usize][x as usize] = Some(ChessPiece::new(colour, kind));
     }
 
     fn delete(&mut self, x: u32, y: u32) {
-        self.0[7 - y as usize][x as usize] = None;
+        self.board[7 - y as usize][x as usize] = None;
     }
 
     fn _move(&mut self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) {
         if let Some(piece) = self.get(from_x, from_y) {
-            self.set(to_x, to_y, piece.colour, piece.kind);
+            let mut piece = *piece;
+            if !piece.has_moved {
+                piece.has_moved = true;
+            }
+            self.board[7 - to_y as usize][to_x as usize] = Some(piece);
             self.delete(from_x, from_y);
+            self.last_move = Some(MoveFromTo::new(from_x, from_y, to_x, to_y));
         } else {
             error!(
                 "tried to move an empty tile from {},{} to {},{}",
@@ -95,7 +106,13 @@ impl Board {
         }
     }
 
-    fn get_pawn_moves(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<Move> {
+    fn get_pawn_moves(
+        &self,
+        x: u32,
+        y: u32,
+        colour: &ChessPieceColour,
+        has_moved: bool,
+    ) -> HashSet<Move> {
         let mut moves = HashSet::new();
 
         let y_offset: i32 = match colour {
@@ -103,27 +120,72 @@ impl Board {
             ChessPieceColour::Black => -1,
         };
         // a situation where we check if a pawn can move to y < 0 (or y > 7) should not happen
-        let potential_y = (y as i32 + y_offset) as u32;
-        for potential_x in x.saturating_sub(1)..=x + 1 {
-            let potential_tile = self.get(potential_x, potential_y);
-            if potential_x == x && potential_tile.is_none() {
-                moves.insert(Move {
-                    x: potential_x,
-                    y: potential_y,
-                    takes: false,
-                });
-            } else if potential_x != x {
-                if let Some(val) = potential_tile {
-                    if &val.colour != colour {
-                        moves.insert(Move {
-                            x: potential_x,
-                            y: potential_y,
-                            takes: true,
-                        });
+        let potential_y = y as i32 + y_offset;
+        if let Some(_move) = self.can_do_move(x, potential_y as u32, colour) {
+            if !_move.takes {
+                moves.insert(_move);
+                if !has_moved {
+                    if let Some(_move) =
+                        self.can_do_move(x, (potential_y + y_offset) as u32, colour)
+                    {
+                        if !_move.takes {
+                            moves.insert(_move);
+                        }
                     }
                 }
             }
         }
+
+        for x_offset in [-1, 1] {
+            let potential_x = x as i32 + x_offset;
+            if let Some(_move) = self.can_do_move(potential_x as u32, potential_y as u32, colour) {
+                if _move.takes {
+                    moves.insert(_move);
+                } else if let Some(last_move) = &self.last_move {
+                    if last_move
+                        == &MoveFromTo::new(
+                            potential_x as u32,
+                            (potential_y + y_offset) as u32,
+                            potential_x as u32,
+                            y,
+                        )
+                    {
+                        if let Some(piece) = self.get(potential_x as u32, y) {
+                            if let ChessPieceKind::Pawn = piece.kind {
+                                // if last turn a pawn could make a move that allows for en passant,
+                                // then there shouldn't be a piece that belongs to the opponent
+                                // in the tile that we have to move to to perform en passant
+                                if let Some(_move) =
+                                    self.can_do_move(potential_x as u32, potential_y as u32, colour)
+                                {
+                                    moves.insert(_move);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // for potential_x in x.saturating_sub(1)..=x + 1 {
+        //     let potential_tile = self.get(potential_x, potential_y);
+        //     if potential_x == x && potential_tile.is_none() {
+        //         moves.insert(Move {
+        //             x: potential_x,
+        //             y: potential_y,
+        //             takes: false,
+        //         });
+        //     } else if potential_x != x {
+        //         if let Some(val) = potential_tile {
+        //             if &val.colour != colour {
+        //                 moves.insert(Move {
+        //                     x: potential_x,
+        //                     y: potential_y,
+        //                     takes: true,
+        //                 });
+        //             }
+        //         }
+        //     }
+        // }
 
         moves
     }
@@ -252,7 +314,7 @@ impl Board {
 
     pub fn get_moves(&self, x: u32, y: u32) -> Option<HashSet<Move>> {
         self.get(x, y).map(|piece| match piece.kind {
-            ChessPieceKind::Pawn => self.get_pawn_moves(x, y, &piece.colour),
+            ChessPieceKind::Pawn => self.get_pawn_moves(x, y, &piece.colour, piece.has_moved),
             ChessPieceKind::Knight => self.get_knight_moves(x, y, &piece.colour),
             ChessPieceKind::Rook => self.get_rook_moves(x, y, &piece.colour),
             ChessPieceKind::Bishop => self.get_bishop_moves(x, y, &piece.colour),
@@ -279,3 +341,6 @@ impl Board {
         }
     }
 }
+
+#[derive(Resource)]
+struct BoardHistory(Vec<Board>);

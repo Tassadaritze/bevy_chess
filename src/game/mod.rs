@@ -56,3 +56,27 @@ impl From<&Move> for TilePos {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct BoardPos {
+    x: u32,
+    y: u32,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct MoveFromTo {
+    from: BoardPos,
+    to: BoardPos,
+}
+
+impl MoveFromTo {
+    pub fn new(from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> Self {
+        Self {
+            from: BoardPos {
+                x: from_x,
+                y: from_y,
+            },
+            to: BoardPos { x: to_x, y: to_y },
+        }
+    }
+}

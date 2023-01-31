@@ -18,13 +18,16 @@ pub enum ChessPieceKind {
 pub struct ChessPiece {
     pub colour: ChessPieceColour,
     pub kind: ChessPieceKind,
-    x: u32,
-    y: u32,
+    pub has_moved: bool,
 }
 
 impl ChessPiece {
-    pub fn new(colour: ChessPieceColour, kind: ChessPieceKind, x: u32, y: u32) -> Self {
-        Self { colour, kind, x, y }
+    pub fn new(colour: ChessPieceColour, kind: ChessPieceKind) -> Self {
+        Self {
+            colour,
+            kind,
+            has_moved: false,
+        }
     }
 }
 
@@ -33,16 +36,37 @@ mod tests {
     use std::collections::HashSet;
 
     use crate::game::board::Board;
-    use crate::game::pieces::{ChessPieceColour, ChessPieceKind};
-    use crate::game::Move;
+    use crate::game::pieces::{ChessPiece, ChessPieceColour, ChessPieceKind};
+    use crate::game::{Move, MoveFromTo};
 
     #[test]
     fn pawn_basic_moves() {
         let mut board = Board::new();
-        board.set(1, 3, ChessPieceColour::White, ChessPieceKind::Pawn);
-        board.set(2, 3, ChessPieceColour::White, ChessPieceKind::Pawn);
-        board.set(2, 4, ChessPieceColour::Black, ChessPieceKind::Pawn);
-        board.set(3, 4, ChessPieceColour::Black, ChessPieceKind::Pawn);
+        // this is the basic pawn movement test, so we'll assume that all of our pawns have already moved
+        board.board[7 - 3][1] = Some(ChessPiece {
+            colour: ChessPieceColour::White,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        board.board[7 - 3][2] = Some(ChessPiece {
+            colour: ChessPieceColour::White,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        board.board[7 - 4][2] = Some(ChessPiece {
+            colour: ChessPieceColour::Black,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        board.board[7 - 4][3] = Some(ChessPiece {
+            colour: ChessPieceColour::Black,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        // board.set(1, 3, ChessPieceColour::White, ChessPieceKind::Pawn);
+        // board.set(2, 3, ChessPieceColour::White, ChessPieceKind::Pawn);
+        // board.set(2, 4, ChessPieceColour::Black, ChessPieceKind::Pawn);
+        // board.set(3, 4, ChessPieceColour::Black, ChessPieceKind::Pawn);
 
         assert_eq!(
             Some(HashSet::from([
@@ -761,10 +785,119 @@ mod tests {
         );
     }
 
-    // TODO: add pawn first move double move and en passant
     #[test]
     fn pawn_double_moves() {
-        todo!()
+        let mut board = Board::new();
+        board.set(4, 1, ChessPieceColour::White, ChessPieceKind::Pawn);
+        board.set(4, 6, ChessPieceColour::Black, ChessPieceKind::Pawn);
+
+        board.board[7 - 4][3] = Some(ChessPiece {
+            colour: ChessPieceColour::White,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        board.board[7 - 3][6] = Some(ChessPiece {
+            colour: ChessPieceColour::White,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        board.board[7 - 4][2] = Some(ChessPiece {
+            colour: ChessPieceColour::Black,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        board.board[7 - 3][5] = Some(ChessPiece {
+            colour: ChessPieceColour::Black,
+            kind: ChessPieceKind::Pawn,
+            has_moved: true,
+        });
+        // board.set(3, 4, ChessPieceColour::White, ChessPieceKind::Pawn);
+        // board.set(6, 3, ChessPieceColour::White, ChessPieceKind::Pawn);
+        // board.set(2, 4, ChessPieceColour::Black, ChessPieceKind::Pawn);
+        // board.set(5, 3, ChessPieceColour::Black, ChessPieceKind::Pawn);
+
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 4,
+                    y: 2,
+                    takes: false,
+                },
+                Move {
+                    x: 4,
+                    y: 3,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(4, 1)
+        );
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 4,
+                    y: 5,
+                    takes: false,
+                },
+                Move {
+                    x: 4,
+                    y: 4,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(4, 6)
+        );
+
+        board.last_move = Some(MoveFromTo::new(2, 6, 2, 4));
+
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 2,
+                    y: 5,
+                    takes: false,
+                },
+                Move {
+                    x: 3,
+                    y: 5,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(3, 4)
+        );
+        assert_eq!(
+            Some(HashSet::from([Move {
+                x: 6,
+                y: 4,
+                takes: false,
+            }])),
+            board.get_moves(6, 3)
+        );
+        assert_eq!(
+            Some(HashSet::from([Move {
+                x: 2,
+                y: 3,
+                takes: false,
+            }])),
+            board.get_moves(2, 4)
+        );
+
+        board.last_move = Some(MoveFromTo::new(6, 1, 6, 3));
+
+        assert_eq!(
+            Some(HashSet::from([
+                Move {
+                    x: 5,
+                    y: 2,
+                    takes: false,
+                },
+                Move {
+                    x: 6,
+                    y: 2,
+                    takes: false,
+                },
+            ])),
+            board.get_moves(5, 3)
+        );
     }
 
     // TODO: add castling
