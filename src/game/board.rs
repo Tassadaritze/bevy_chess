@@ -97,6 +97,28 @@ impl Board {
             }
             self.board[7 - to_y as usize][to_x as usize] = Some(piece);
             self.delete(from_x, from_y);
+
+            match piece.kind {
+                ChessPieceKind::King => {
+                    if from_y == to_y && from_x.abs_diff(to_x) == 2 {
+                        let (towards_rook, rook_x): (i32, u32) = match to_x.checked_sub(from_x) {
+                            None => (-1, 0),
+                            Some(_) => (1, 7),
+                        };
+                        self._move(rook_x, from_y, (to_x as i32 - towards_rook) as u32, from_y);
+                    }
+                }
+                ChessPieceKind::Pawn => {
+                    if from_x.abs_diff(to_x) == 1
+                        && from_y.abs_diff(to_y) == 1
+                        && self.last_move == Some(MoveFromTo::new(to_x, to_y + 1, to_x, from_y))
+                    {
+                        self.delete(to_x, from_y);
+                    }
+                }
+                _ => (),
+            };
+
             self.last_move = Some(MoveFromTo::new(from_x, from_y, to_x, to_y));
         } else {
             error!(
