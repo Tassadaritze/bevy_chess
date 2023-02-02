@@ -105,9 +105,19 @@ impl Board {
                     }
                 }
                 ChessPieceKind::Pawn => {
+                    let y_offset = match piece.colour {
+                        ChessPieceColour::White => 1,
+                        ChessPieceColour::Black => -1,
+                    };
                     if from_x.abs_diff(to_x) == 1
                         && from_y.abs_diff(to_y) == 1
-                        && self.last_move == Some(MoveFromTo::new(to_x, to_y + 1, to_x, from_y))
+                        && self.last_move
+                            == Some(MoveFromTo::new(
+                                to_x,
+                                (to_y as i32 + y_offset) as u32,
+                                to_x,
+                                from_y,
+                            ))
                     {
                         self.delete(to_x, from_y);
                     }
