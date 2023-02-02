@@ -13,13 +13,20 @@ use crate::tilemap::move_indicators::{
 use crate::tilemap::pieces::{draw_piece_tilemap, ChessPieceHandle};
 use crate::tilemap::ranks_and_files::create_labels;
 use crate::utils::cursor::{update_cursor_pos, CursorPos};
+use crate::utils::on_window_resize;
 
 mod game;
 mod tilemap;
 mod utils;
 
 fn spawn_camera(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle {
+        transform: Transform {
+            translation: Vec3::new(-48.0, -48.0, 999.9),
+            ..default()
+        },
+        ..default()
+    });
 }
 
 fn main() {
@@ -29,6 +36,8 @@ fn main() {
                 .set(WindowPlugin {
                     window: WindowDescriptor {
                         title: String::from("Chess"),
+                        width: 1600.,
+                        height: 900.,
                         ..default()
                     },
                     ..default()
@@ -52,5 +61,6 @@ fn main() {
         .add_system(spawn_move_indicators)
         .add_system(show_hover_ring.after(update_cursor_pos))
         .add_system(mouse_click.after(update_cursor_pos))
+        .add_system(on_window_resize)
         .run();
 }

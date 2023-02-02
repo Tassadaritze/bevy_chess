@@ -55,35 +55,38 @@ pub fn show_hover_ring(
     hovered_tiles_q: Query<Entity, With<HasHoverRing>>,
     mut hover_ring_q: Query<(&mut Transform, &mut Visibility), With<HoverRing>>,
 ) {
-    for hovered_tile_entity in hovered_tiles_q.iter() {
-        let (_, mut hover_ring_visibility) = hover_ring_q.single_mut();
-        hover_ring_visibility.is_visible = false;
-        commands
-            .entity(hovered_tile_entity)
-            .remove::<HasHoverRing>();
-    }
+    if cursor_pos.is_changed() {
+        for hovered_tile_entity in hovered_tiles_q.iter() {
+            let (_, mut hover_ring_visibility) = hover_ring_q.single_mut();
+            hover_ring_visibility.is_visible = false;
+            commands
+                .entity(hovered_tile_entity)
+                .remove::<HasHoverRing>();
+        }
 
-    for (map_size, grid_size, map_type, tile_storage, map_transform) in tilemap_q.iter() {
-        let cursor_pos: Vec3 = cursor_pos.0;
-        let cursor_in_map_pos: Vec2 = {
-            let cursor_pos = Vec4::from((cursor_pos, 1.0));
-            let cursor_in_map_pos = map_transform.compute_matrix().inverse() * cursor_pos;
-            cursor_in_map_pos.xy()
-        };
+        for (map_size, grid_size, map_type, tile_storage, map_transform) in tilemap_q.iter() {
+            let cursor_pos: Vec3 = cursor_pos.0;
+            let cursor_in_map_pos: Vec2 = {
+                let cursor_pos = Vec4::from((cursor_pos, 1.0));
+                let cursor_in_map_pos = map_transform.compute_matrix().inverse() * cursor_pos;
+                cursor_in_map_pos.xy()
+            };
 
-        if let Some(tile_pos) =
-            TilePos::from_world_pos(&cursor_in_map_pos, map_size, grid_size, map_type)
-        {
-            if let Some(tile_entity) = tile_storage.get(&tile_pos) {
-                let tile_center = tile_pos
-                    .center_in_world(grid_size, map_type)
-                    .extend(HOVER_RING_Z);
-                for (mut hover_ring_transform, mut hover_ring_visibility) in hover_ring_q.iter_mut()
-                {
-                    *hover_ring_transform = Transform::from_translation(tile_center);
-                    hover_ring_visibility.is_visible = true;
+            if let Some(tile_pos) =
+                TilePos::from_world_pos(&cursor_in_map_pos, map_size, grid_size, map_type)
+            {
+                if let Some(tile_entity) = tile_storage.get(&tile_pos) {
+                    let tile_center = tile_pos
+                        .center_in_world(grid_size, map_type)
+                        .extend(HOVER_RING_Z);
+                    for (mut hover_ring_transform, mut hover_ring_visibility) in
+                        hover_ring_q.iter_mut()
+                    {
+                        *hover_ring_transform = Transform::from_translation(tile_center);
+                        hover_ring_visibility.is_visible = true;
+                    }
+                    commands.entity(tile_entity).insert(HasHoverRing);
                 }
-                commands.entity(tile_entity).insert(HasHoverRing);
             }
         }
     }
