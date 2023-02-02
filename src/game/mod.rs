@@ -12,6 +12,9 @@ use crate::utils::cursor;
 pub mod board;
 pub mod pieces;
 
+#[derive(Resource, Default)]
+pub struct IsBlackTurn(pub bool);
+
 #[derive(Default)]
 pub struct BoardClickEvent {
     pub tile: TilePos,

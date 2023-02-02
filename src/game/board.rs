@@ -50,10 +50,6 @@ impl Default for Board {
         board.set(6, 0, ChessPieceColour::White, ChessPieceKind::Knight);
         board.set(7, 0, ChessPieceColour::White, ChessPieceKind::Rook);
 
-        // TODO: return this to actual starting game state
-        board.set(3, 4, ChessPieceColour::Black, ChessPieceKind::Queen);
-        board.set(4, 4, ChessPieceColour::White, ChessPieceKind::Queen);
-
         board
     }
 }
