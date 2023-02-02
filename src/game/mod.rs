@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 
 use crate::game::board::{Board, BoardHistory};
+use crate::game::pieces::ChessPieceColour;
 use crate::tilemap::board::BoardTilemap;
 use crate::tilemap::move_indicators::{MoveIndicator, SelectedTile};
 use crate::utils::cursor;
@@ -25,6 +26,7 @@ pub struct BoardClickEvent {
 pub fn mouse_click(
     mouse_input: Res<Input<MouseButton>>,
     cursor_pos: Res<cursor::CursorPos>,
+    mut is_black_turn: ResMut<IsBlackTurn>,
     mut board: ResMut<Board>,
     mut history: ResMut<BoardHistory>,
     tilemap_q: Query<
@@ -55,10 +57,28 @@ pub fn mouse_click(
         {
             if let Some(tile_entity) = tile_storage.get(&tile_pos) {
                 if tiles_w_indicators_q.get(tile_entity).is_err() {
+                    // deselect selected tile if clicked again
                     if let Ok(selected_tile) = tile_selected_q.get_single() {
                         if selected_tile == &tile_pos {
                             click_ev.send(BoardClickEvent::default());
                             return;
+                        }
+                    }
+                    // deselect/do nothing if it's not that side's turn
+                    if let Some(piece) = board.get(tile_pos.x, tile_pos.y) {
+                        match is_black_turn.0 {
+                            true => {
+                                if let ChessPieceColour::White = piece.colour {
+                                    click_ev.send(BoardClickEvent::default());
+                                    return;
+                                }
+                            }
+                            false => {
+                                if let ChessPieceColour::Black = piece.colour {
+                                    click_ev.send(BoardClickEvent::default());
+                                    return;
+                                }
+                            }
                         }
                     }
                     let moves = board.get_moves(tile_pos.x, tile_pos.y);
@@ -69,6 +89,7 @@ pub fn mouse_click(
                 } else if let Ok(selected_tile) = tile_selected_q.get_single() {
                     history.0.push(board.clone());
                     board._move(selected_tile.x, selected_tile.y, tile_pos.x, tile_pos.y);
+                    is_black_turn.0 = !is_black_turn.0;
                     click_ev.send(BoardClickEvent::default());
                 }
             }
