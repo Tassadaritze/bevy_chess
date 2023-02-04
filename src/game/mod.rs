@@ -113,10 +113,22 @@ impl From<&Move> for TilePos {
     }
 }
 
+impl PartialEq<BoardPos> for Move {
+    fn eq(&self, other: &BoardPos) -> bool {
+        self.x == other.x && self.y == other.y
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct BoardPos {
     x: u32,
     y: u32,
+}
+
+impl PartialEq<Move> for BoardPos {
+    fn eq(&self, other: &Move) -> bool {
+        self.x == other.x && self.y == other.y
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]

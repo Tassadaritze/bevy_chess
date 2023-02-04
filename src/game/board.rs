@@ -1,8 +1,9 @@
-use bevy::prelude::*;
 use std::collections::HashSet;
 
+use bevy::prelude::*;
+
 use crate::game::pieces::{ChessPiece, ChessPieceColour, ChessPieceKind};
-use crate::game::{Move, MoveFromTo};
+use crate::game::{BoardPos, Move, MoveFromTo};
 
 #[derive(Resource, Debug, Clone)]
 pub struct Board {
@@ -72,13 +73,13 @@ impl Board {
     }
 
     pub fn get(&self, x: u32, y: u32) -> Option<&ChessPiece> {
-        self.board[7 - y as usize]
-            .get(x as usize)
-            .and_then(|piece| piece.as_ref())
+        self.board
+            .get(7_usize.checked_sub(y as usize)?)
+            .and_then(|row| row.get(x as usize).and_then(|piece| piece.as_ref()))
     }
 
     pub fn set(&mut self, x: u32, y: u32, colour: ChessPieceColour, kind: ChessPieceKind) {
-        self.board[7 - y as usize][x as usize] = Some(ChessPiece::new(colour, kind));
+        self.board[7 - y as usize][x as usize] = Some(ChessPiece::new(x, y, colour, kind));
     }
 
     fn delete(&mut self, x: u32, y: u32) {
@@ -91,6 +92,8 @@ impl Board {
             if !piece.has_moved {
                 piece.has_moved = true;
             }
+            piece.x = to_x;
+            piece.y = to_y;
             self.board[7 - to_y as usize][to_x as usize] = Some(piece);
             self.delete(from_x, from_y);
 
@@ -133,6 +136,19 @@ impl Board {
             );
         }
     }
+
+    const KNIGHT_MOVE_OFFSETS: [(i32, i32); 8] = [
+        (1, 2),
+        (2, 1),
+        (-1, 2),
+        (-2, 1),
+        (1, -2),
+        (2, -1),
+        (-1, -2),
+        (-2, -1),
+    ];
+    const ROOK_MOVE_OFFSETS: [i32; 2] = [-1, 1];
+    const BISHOP_MOVE_OFFSETS: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 
     fn get_pawn_moves(
         &self,
@@ -202,20 +218,9 @@ impl Board {
     }
 
     fn get_knight_moves(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<Move> {
-        const KNIGHT_MOVE_OFFSETS: [(i32, i32); 8] = [
-            (1, 2),
-            (2, 1),
-            (-1, 2),
-            (-2, 1),
-            (1, -2),
-            (2, -1),
-            (-1, -2),
-            (-2, -1),
-        ];
-
         let mut moves = HashSet::new();
 
-        for (x_offset, y_offset) in KNIGHT_MOVE_OFFSETS {
+        for (x_offset, y_offset) in Self::KNIGHT_MOVE_OFFSETS {
             let potential_x = x as i32 + x_offset;
             let potential_y = y as i32 + y_offset;
             if (0..8).contains(&potential_x) && (0..8).contains(&potential_y) {
@@ -244,11 +249,9 @@ impl Board {
     }
 
     fn get_rook_moves(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<Move> {
-        const ROOK_MOVE_OFFSETS: [i32; 2] = [-1, 1];
-
         let mut moves = HashSet::new();
 
-        for x_offset in ROOK_MOVE_OFFSETS {
+        for x_offset in Self::ROOK_MOVE_OFFSETS {
             let mut potential_x = x as i32 + x_offset;
             while let Some(_move) = self.can_do_move(potential_x as u32, y, colour) {
                 potential_x += x_offset;
@@ -260,7 +263,7 @@ impl Board {
             }
         }
 
-        for y_offset in ROOK_MOVE_OFFSETS {
+        for y_offset in Self::ROOK_MOVE_OFFSETS {
             let mut potential_y = y as i32 + y_offset;
             while let Some(_move) = self.can_do_move(x, potential_y as u32, colour) {
                 potential_y += y_offset;
@@ -276,11 +279,9 @@ impl Board {
     }
 
     fn get_bishop_moves(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<Move> {
-        const BISHOP_MOVE_OFFSETS: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
-
         let mut moves = HashSet::new();
 
-        for (x_offset, y_offset) in BISHOP_MOVE_OFFSETS {
+        for (x_offset, y_offset) in Self::BISHOP_MOVE_OFFSETS {
             let mut potential_x = x as i32 + x_offset;
             let mut potential_y = y as i32 + y_offset;
             while let Some(_move) = self.can_do_move(potential_x as u32, potential_y as u32, colour)
@@ -357,7 +358,172 @@ impl Board {
             }
         }
 
+        for piece in self
+            .iter()
+            .flatten()
+            .filter(|piece| &piece.colour != colour)
+        {
+            let threats = match self.get_threatened_tiles(piece.x, piece.y) {
+                Some(threats) => threats,
+                None => continue,
+            };
+            let moves_to_remove: Vec<Move> = moves
+                .iter()
+                .filter(|&_move| threats.iter().any(|threat| _move == threat))
+                .cloned()
+                .collect();
+            for _move in moves_to_remove {
+                moves.remove(&_move);
+            }
+        }
+
         moves
+    }
+
+    fn get_pawn_threats(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<BoardPos> {
+        let mut threats = HashSet::new();
+
+        let y_offset: i32 = match colour {
+            ChessPieceColour::White => 1,
+            ChessPieceColour::Black => -1,
+        };
+        let potential_y = (y as i32 + y_offset) as u32;
+
+        if (0..8).contains(&potential_y) {
+            for x_offset in [-1, 1] {
+                let potential_x = (x as i32 + x_offset) as u32;
+                if (0..8).contains(&potential_x) {
+                    threats.insert(BoardPos {
+                        x: potential_x,
+                        y: potential_y,
+                    });
+                }
+            }
+        }
+
+        threats
+    }
+
+    fn get_knight_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
+        let mut threats = HashSet::new();
+
+        for (x_offset, y_offset) in Self::KNIGHT_MOVE_OFFSETS {
+            let potential_x = (x as i32 + x_offset) as u32;
+            let potential_y = (y as i32 + y_offset) as u32;
+            if (0..8).contains(&potential_x) && (0..8).contains(&potential_y) {
+                threats.insert(BoardPos {
+                    x: potential_x,
+                    y: potential_y,
+                });
+            }
+        }
+
+        threats
+    }
+
+    fn get_rook_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
+        let mut threats = HashSet::new();
+
+        for x_offset in Self::ROOK_MOVE_OFFSETS {
+            let mut potential_x = x as i32 + x_offset;
+            if (0..8).contains(&potential_x) {
+                while self.get(potential_x as u32, y).is_none() {
+                    threats.insert(BoardPos {
+                        x: potential_x as u32,
+                        y,
+                    });
+                    potential_x += x_offset;
+                    if !(0..8).contains(&potential_x) {
+                        break;
+                    }
+                }
+                if self.get(potential_x as u32, y).is_some() {
+                    threats.insert(BoardPos {
+                        x: potential_x as u32,
+                        y,
+                    });
+                }
+            }
+        }
+
+        for y_offset in Self::ROOK_MOVE_OFFSETS {
+            let mut potential_y = y as i32 + y_offset;
+            if (0..8).contains(&potential_y) {
+                while self.get(x, potential_y as u32).is_none() {
+                    threats.insert(BoardPos {
+                        x,
+                        y: potential_y as u32,
+                    });
+                    potential_y += y_offset;
+                    if !(0..8).contains(&potential_y) {
+                        break;
+                    }
+                }
+                if self.get(x, potential_y as u32).is_some() {
+                    threats.insert(BoardPos {
+                        x,
+                        y: potential_y as u32,
+                    });
+                }
+            }
+        }
+
+        threats
+    }
+
+    fn get_bishop_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
+        let mut threats = HashSet::new();
+
+        for (x_offset, y_offset) in Self::BISHOP_MOVE_OFFSETS {
+            let mut potential_x = x as i32 + x_offset;
+            let mut potential_y = y as i32 + y_offset;
+            if (0..8).contains(&potential_x) && (0..8).contains(&potential_y) {
+                while self.get(potential_x as u32, potential_y as u32).is_none() {
+                    threats.insert(BoardPos {
+                        x: potential_x as u32,
+                        y: potential_y as u32,
+                    });
+                    potential_x += x_offset;
+                    potential_y += y_offset;
+                    if !((0..8).contains(&potential_x) && (0..8).contains(&potential_y)) {
+                        break;
+                    }
+                }
+                if self.get(potential_x as u32, potential_y as u32).is_some() {
+                    threats.insert(BoardPos {
+                        x: potential_x as u32,
+                        y: potential_y as u32,
+                    });
+                }
+            }
+        }
+
+        threats
+    }
+
+    fn get_queen_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
+        &self.get_rook_threats(x, y) | &self.get_bishop_threats(x, y)
+    }
+
+    fn get_king_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
+        let mut threats = HashSet::new();
+
+        // basic moves
+        for y_offset in -1..=1 {
+            for x_offset in -1..=1 {
+                if x_offset == y_offset && x_offset == 0 {
+                    continue;
+                }
+                let potential_x = (x as i32 + x_offset) as u32;
+                let potential_y = (y as i32 + y_offset) as u32;
+                threats.insert(BoardPos {
+                    x: potential_x,
+                    y: potential_y,
+                });
+            }
+        }
+
+        threats
     }
 
     pub fn get_moves(&self, x: u32, y: u32) -> Option<HashSet<Move>> {
@@ -368,6 +534,17 @@ impl Board {
             ChessPieceKind::Bishop => self.get_bishop_moves(x, y, &piece.colour),
             ChessPieceKind::Queen => self.get_queen_moves(x, y, &piece.colour),
             ChessPieceKind::King => self.get_king_moves(x, y, &piece.colour, piece.has_moved),
+        })
+    }
+
+    pub fn get_threatened_tiles(&self, x: u32, y: u32) -> Option<HashSet<BoardPos>> {
+        self.get(x, y).map(|piece| match piece.kind {
+            ChessPieceKind::Pawn => self.get_pawn_threats(x, y, &piece.colour),
+            ChessPieceKind::Knight => self.get_knight_threats(x, y),
+            ChessPieceKind::Rook => self.get_rook_threats(x, y),
+            ChessPieceKind::Bishop => self.get_bishop_threats(x, y),
+            ChessPieceKind::Queen => self.get_queen_threats(x, y),
+            ChessPieceKind::King => self.get_king_threats(x, y),
         })
     }
 
@@ -387,6 +564,15 @@ impl Board {
             }
             None => Some(Move { x, y, takes: false }),
         }
+    }
+
+    pub fn iter(&self) -> Box<dyn Iterator<Item = Option<&ChessPiece>> + '_> {
+        let mut iter: Box<dyn Iterator<Item = Option<&ChessPiece>>> =
+            Box::new(self.board[0].iter().map(|el| el.as_ref()));
+        for row in self.board.iter().skip(1) {
+            iter = Box::new(iter.chain(row.iter().map(|el| el.as_ref())));
+        }
+        iter
     }
 }
 

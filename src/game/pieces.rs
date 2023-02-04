@@ -4,7 +4,7 @@ pub enum ChessPieceColour {
     Black,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ChessPieceKind {
     Pawn,
     Knight,
@@ -16,14 +16,18 @@ pub enum ChessPieceKind {
 
 #[derive(Debug, Copy, Clone)]
 pub struct ChessPiece {
+    pub x: u32,
+    pub y: u32,
     pub colour: ChessPieceColour,
     pub kind: ChessPieceKind,
     pub has_moved: bool,
 }
 
 impl ChessPiece {
-    pub fn new(colour: ChessPieceColour, kind: ChessPieceKind) -> Self {
+    pub fn new(x: u32, y: u32, colour: ChessPieceColour, kind: ChessPieceKind) -> Self {
         Self {
+            x,
+            y,
             colour,
             kind,
             has_moved: false,
@@ -44,21 +48,29 @@ mod tests {
         let mut board = Board::new();
         // this is the basic pawn movement test, so we'll assume that all of our pawns have already moved
         board.board[7 - 3][1] = Some(ChessPiece {
+            x: 1,
+            y: 3,
             colour: ChessPieceColour::White,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
         });
         board.board[7 - 3][2] = Some(ChessPiece {
+            x: 2,
+            y: 3,
             colour: ChessPieceColour::White,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
         });
         board.board[7 - 4][2] = Some(ChessPiece {
+            x: 2,
+            y: 4,
             colour: ChessPieceColour::Black,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
         });
         board.board[7 - 4][3] = Some(ChessPiece {
+            x: 3,
+            y: 4,
             colour: ChessPieceColour::Black,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
@@ -752,11 +764,6 @@ mod tests {
                 },
                 Move {
                     x: 3,
-                    y: 2,
-                    takes: false
-                },
-                Move {
-                    x: 3,
                     y: 1,
                     takes: false
                 },
@@ -768,11 +775,6 @@ mod tests {
                 Move {
                     x: 1,
                     y: 1,
-                    takes: false
-                },
-                Move {
-                    x: 1,
-                    y: 2,
                     takes: false
                 },
                 Move {
@@ -792,21 +794,29 @@ mod tests {
         board.set(4, 6, ChessPieceColour::Black, ChessPieceKind::Pawn);
 
         board.board[7 - 4][3] = Some(ChessPiece {
+            x: 3,
+            y: 4,
             colour: ChessPieceColour::White,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
         });
         board.board[7 - 3][6] = Some(ChessPiece {
+            x: 6,
+            y: 3,
             colour: ChessPieceColour::White,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
         });
         board.board[7 - 4][2] = Some(ChessPiece {
+            x: 2,
+            y: 4,
             colour: ChessPieceColour::Black,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
         });
         board.board[7 - 3][5] = Some(ChessPiece {
+            x: 5,
+            y: 3,
             colour: ChessPieceColour::Black,
             kind: ChessPieceKind::Pawn,
             has_moved: true,
