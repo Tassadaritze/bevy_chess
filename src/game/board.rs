@@ -358,22 +358,44 @@ impl Board {
             }
         }
 
+        let mut threats: HashSet<BoardPos> = HashSet::new();
         for piece in self
             .iter()
             .flatten()
             .filter(|piece| &piece.colour != colour)
         {
-            let threats = match self.get_threatened_tiles(piece.x, piece.y) {
-                Some(threats) => threats,
+            match self.get_threatened_tiles(piece.x, piece.y) {
+                Some(new_threats) => threats = &threats | &new_threats,
                 None => continue,
             };
-            let moves_to_remove: Vec<Move> = moves
-                .iter()
-                .filter(|&_move| threats.iter().any(|threat| _move == threat))
-                .cloned()
-                .collect();
-            for _move in moves_to_remove {
-                moves.remove(&_move);
+        }
+        let moves_to_remove: Vec<Move> = moves
+            .iter()
+            .filter(|&_move| threats.iter().any(|threat| _move == threat))
+            .cloned()
+            .collect();
+        for _move in moves_to_remove {
+            moves.remove(&_move);
+        }
+
+        // can't jump over threats to castle
+        if !has_moved {
+            for x_offset in [-1, 1] {
+                let one_away = x as i32 + x_offset;
+                let two_away = one_away + x_offset;
+
+                let castling_move = moves
+                    .iter()
+                    .cloned()
+                    .find(|_move| _move.x == two_away as u32 && _move.y == y);
+                if let Some(_move) = castling_move {
+                    if moves
+                        .iter()
+                        .all(|_move| !(_move.x == one_away as u32 && _move.y == y))
+                    {
+                        moves.remove(&_move);
+                    }
+                }
             }
         }
 
