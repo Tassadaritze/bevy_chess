@@ -443,13 +443,22 @@ impl Board {
         threats
     }
 
-    fn get_rook_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
+    fn get_rook_threats(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<BoardPos> {
         let mut threats = HashSet::new();
 
         for x_offset in Self::ROOK_MOVE_OFFSETS {
             let mut potential_x = x as i32 + x_offset;
             if (0..8).contains(&potential_x) {
-                while self.get(potential_x as u32, y).is_none() {
+                let mut next_tile = self.get(potential_x as u32, y);
+                loop {
+                    if let Some(piece) = next_tile {
+                        if std::mem::discriminant(&piece.colour) == std::mem::discriminant(colour)
+                            || std::mem::discriminant(&piece.kind)
+                                != std::mem::discriminant(&ChessPieceKind::King)
+                        {
+                            break;
+                        }
+                    }
                     threats.insert(BoardPos {
                         x: potential_x as u32,
                         y,
@@ -458,6 +467,7 @@ impl Board {
                     if !(0..8).contains(&potential_x) {
                         break;
                     }
+                    next_tile = self.get(potential_x as u32, y);
                 }
                 if self.get(potential_x as u32, y).is_some() {
                     threats.insert(BoardPos {
@@ -471,7 +481,16 @@ impl Board {
         for y_offset in Self::ROOK_MOVE_OFFSETS {
             let mut potential_y = y as i32 + y_offset;
             if (0..8).contains(&potential_y) {
-                while self.get(x, potential_y as u32).is_none() {
+                let mut next_tile = self.get(x, potential_y as u32);
+                loop {
+                    if let Some(piece) = next_tile {
+                        if std::mem::discriminant(&piece.colour) == std::mem::discriminant(colour)
+                            || std::mem::discriminant(&piece.kind)
+                                != std::mem::discriminant(&ChessPieceKind::King)
+                        {
+                            break;
+                        }
+                    }
                     threats.insert(BoardPos {
                         x,
                         y: potential_y as u32,
@@ -480,6 +499,7 @@ impl Board {
                     if !(0..8).contains(&potential_y) {
                         break;
                     }
+                    next_tile = self.get(x, potential_y as u32);
                 }
                 if self.get(x, potential_y as u32).is_some() {
                     threats.insert(BoardPos {
@@ -493,14 +513,23 @@ impl Board {
         threats
     }
 
-    fn get_bishop_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
+    fn get_bishop_threats(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<BoardPos> {
         let mut threats = HashSet::new();
 
         for (x_offset, y_offset) in Self::BISHOP_MOVE_OFFSETS {
             let mut potential_x = x as i32 + x_offset;
             let mut potential_y = y as i32 + y_offset;
             if (0..8).contains(&potential_x) && (0..8).contains(&potential_y) {
-                while self.get(potential_x as u32, potential_y as u32).is_none() {
+                let mut next_tile = self.get(potential_x as u32, potential_y as u32);
+                loop {
+                    if let Some(piece) = next_tile {
+                        if std::mem::discriminant(&piece.colour) == std::mem::discriminant(colour)
+                            || std::mem::discriminant(&piece.kind)
+                                != std::mem::discriminant(&ChessPieceKind::King)
+                        {
+                            break;
+                        }
+                    }
                     threats.insert(BoardPos {
                         x: potential_x as u32,
                         y: potential_y as u32,
@@ -510,6 +539,7 @@ impl Board {
                     if !((0..8).contains(&potential_x) && (0..8).contains(&potential_y)) {
                         break;
                     }
+                    next_tile = self.get(potential_x as u32, potential_y as u32);
                 }
                 if self.get(potential_x as u32, potential_y as u32).is_some() {
                     threats.insert(BoardPos {
@@ -523,8 +553,8 @@ impl Board {
         threats
     }
 
-    fn get_queen_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
-        &self.get_rook_threats(x, y) | &self.get_bishop_threats(x, y)
+    fn get_queen_threats(&self, x: u32, y: u32, colour: &ChessPieceColour) -> HashSet<BoardPos> {
+        &self.get_rook_threats(x, y, colour) | &self.get_bishop_threats(x, y, colour)
     }
 
     fn get_king_threats(&self, x: u32, y: u32) -> HashSet<BoardPos> {
@@ -563,9 +593,9 @@ impl Board {
         self.get(x, y).map(|piece| match piece.kind {
             ChessPieceKind::Pawn => self.get_pawn_threats(x, y, &piece.colour),
             ChessPieceKind::Knight => self.get_knight_threats(x, y),
-            ChessPieceKind::Rook => self.get_rook_threats(x, y),
-            ChessPieceKind::Bishop => self.get_bishop_threats(x, y),
-            ChessPieceKind::Queen => self.get_queen_threats(x, y),
+            ChessPieceKind::Rook => self.get_rook_threats(x, y, &piece.colour),
+            ChessPieceKind::Bishop => self.get_bishop_threats(x, y, &piece.colour),
+            ChessPieceKind::Queen => self.get_queen_threats(x, y, &piece.colour),
             ChessPieceKind::King => self.get_king_threats(x, y),
         })
     }
