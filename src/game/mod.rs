@@ -5,10 +5,10 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 
 use crate::game::board::{Board, BoardHistory};
-use crate::game::pieces::ChessPieceColour;
+use crate::game::pieces::{ChessPieceColour, ChessPieceKind};
 use crate::tilemap::board::BoardTilemap;
 use crate::tilemap::move_indicators::{MoveIndicator, SelectedTile};
-use crate::utils::cursor;
+use crate::utils::cursor::CursorPos;
 
 pub mod board;
 pub mod pieces;
@@ -22,10 +22,13 @@ pub struct BoardClickEvent {
     pub moves: Option<HashSet<Move>>,
 }
 
+#[derive(Default)]
+pub struct CheckEvent(pub Option<TilePos>);
+
 #[allow(clippy::too_many_arguments)]
 pub fn mouse_click(
     mouse_input: Res<Input<MouseButton>>,
-    cursor_pos: Res<cursor::CursorPos>,
+    cursor_pos: Res<CursorPos>,
     mut is_black_turn: ResMut<IsBlackTurn>,
     mut board: ResMut<Board>,
     mut history: ResMut<BoardHistory>,
@@ -42,6 +45,7 @@ pub fn mouse_click(
     tiles_w_indicators_q: Query<(), With<MoveIndicator>>,
     tile_selected_q: Query<&TilePos, With<SelectedTile>>,
     mut click_ev: EventWriter<BoardClickEvent>,
+    mut check_ev: EventWriter<CheckEvent>,
 ) {
     if mouse_input.just_pressed(MouseButton::Left) {
         let (map_size, grid_size, map_type, map_transform, tile_storage) = tilemap_q.single();
@@ -91,6 +95,32 @@ pub fn mouse_click(
                     board._move(selected_tile.x, selected_tile.y, tile_pos.x, tile_pos.y);
                     is_black_turn.0 = !is_black_turn.0;
                     click_ev.send(BoardClickEvent::default());
+
+                    if let Some(king) = board.iter().find_map(|piece| {
+                        piece.and_then(|piece| {
+                            if let ChessPieceKind::King = piece.kind {
+                                if std::mem::discriminant(&piece.colour)
+                                    != std::mem::discriminant(
+                                        &board.get(tile_pos.x, tile_pos.y).unwrap().colour,
+                                    )
+                                {
+                                    return Some(piece);
+                                }
+                            }
+                            None
+                        })
+                    }) {
+                        if let Some(threats) = board.get_threatened_tiles(tile_pos.x, tile_pos.y) {
+                            if threats.contains(&BoardPos {
+                                x: king.x,
+                                y: king.y,
+                            }) {
+                                check_ev.send(CheckEvent(Some(TilePos::new(king.x, king.y))));
+                            } else {
+                                check_ev.send(CheckEvent::default());
+                            }
+                        }
+                    }
                 }
             }
         }

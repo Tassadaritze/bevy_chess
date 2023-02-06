@@ -74,8 +74,9 @@ impl Board {
 
     pub fn get(&self, x: u32, y: u32) -> Option<&ChessPiece> {
         self.board
-            .get(7_usize.checked_sub(y as usize)?)
-            .and_then(|row| row.get(x as usize).and_then(|piece| piece.as_ref()))
+            .get(7_usize.checked_sub(y as usize)?)?
+            .get(x as usize)?
+            .as_ref()
     }
 
     pub fn set(&mut self, x: u32, y: u32, colour: ChessPieceColour, kind: ChessPieceKind) {

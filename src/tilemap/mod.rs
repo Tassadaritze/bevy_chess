@@ -1,4 +1,5 @@
 pub mod board;
+pub mod checked_tile;
 pub mod hover;
 pub mod move_indicators;
 pub mod pieces;

@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 
 use crate::game::board::{Board, BoardHistory};
-use crate::game::{mouse_click, BoardClickEvent, IsBlackTurn};
+use crate::game::{mouse_click, BoardClickEvent, CheckEvent, IsBlackTurn};
 use crate::tilemap::board::create_board_tilemap;
+use crate::tilemap::checked_tile::{spawn_checked_tile, CheckedTileHandle};
 use crate::tilemap::hover::{show_hover_ring, spawn_hover_ring};
 use crate::tilemap::move_indicators::{
     spawn_move_indicators, MoveIndicatorHandle, TakeIndicatorHandle,
@@ -50,7 +51,9 @@ fn main() {
         .init_resource::<MoveIndicatorHandle>()
         .init_resource::<TakeIndicatorHandle>()
         .init_resource::<ChessPieceHandle>()
+        .init_resource::<CheckedTileHandle>()
         .add_event::<BoardClickEvent>()
+        .add_event::<CheckEvent>()
         .add_plugin(TilemapPlugin)
         .add_startup_system(spawn_camera)
         .add_startup_system(create_board_tilemap)
@@ -61,6 +64,7 @@ fn main() {
         .add_system(draw_turn_indicators)
         .add_system(update_cursor_pos)
         .add_system(spawn_move_indicators)
+        .add_system(spawn_checked_tile)
         .add_system(show_hover_ring.after(update_cursor_pos))
         .add_system(mouse_click.after(update_cursor_pos))
         .add_system(on_window_resize)
