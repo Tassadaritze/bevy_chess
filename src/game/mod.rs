@@ -68,8 +68,10 @@ pub fn mouse_click(
                             return;
                         }
                     }
-                    // deselect/do nothing if it's not that side's turn
                     if let Some(piece) = board.get(tile_pos.x, tile_pos.y) {
+                        assert!(piece.x == tile_pos.x && piece.y == tile_pos.y);
+
+                        // deselect/do nothing if it's not that side's turn
                         match is_black_turn.0 {
                             true => {
                                 if let ChessPieceColour::White = piece.colour {
@@ -84,43 +86,138 @@ pub fn mouse_click(
                                 }
                             }
                         }
+
+                        let mut moves = board.get_moves(piece.x, piece.y);
+
+                        if let Some(check) = board.check {
+                            if piece.colour == check && piece.kind != ChessPieceKind::King {
+                                if let Some(moves) = &mut moves {
+                                    if !moves.is_empty() {
+                                        let attackers = board.get_king_attackers(check);
+                                        // if the king managed to get in check, we're assuming he exists
+                                        let king =
+                                            board.find_piece(ChessPieceKind::King, check).unwrap();
+                                        if attackers.len() > 1 {
+                                            moves.clear();
+                                        } else {
+                                            for attacker in attackers {
+                                                if let ChessPieceKind::Rook
+                                                | ChessPieceKind::Bishop
+                                                | ChessPieceKind::Queen = attacker.kind
+                                                {
+                                                    let threats = board
+                                                        .get_threatened_tiles(
+                                                            attacker.x, attacker.y,
+                                                        )
+                                                        .unwrap()
+                                                        .between(
+                                                            BoardPos {
+                                                                x: king.x,
+                                                                y: king.y,
+                                                            },
+                                                            BoardPos {
+                                                                x: attacker.x,
+                                                                y: attacker.y,
+                                                            },
+                                                        );
+                                                    moves.retain(|_move| {
+                                                        threats.iter().any(|threat| _move == threat)
+                                                            || _move
+                                                                == &BoardPos {
+                                                                    x: attacker.x,
+                                                                    y: attacker.y,
+                                                                }
+                                                    });
+                                                } else {
+                                                    moves.retain(|_move| {
+                                                        _move
+                                                            == &BoardPos {
+                                                                x: attacker.x,
+                                                                y: attacker.y,
+                                                            }
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // is this piece pinned?
+                        if let Some(moves) = &mut moves {
+                            if !moves.is_empty() {
+                                if let Some(king) =
+                                    board.find_piece(ChessPieceKind::King, piece.colour)
+                                {
+                                    for potential_attacker in
+                                        board.iter().flatten().filter(|piece| {
+                                            if piece.colour != king.colour {
+                                                if let ChessPieceKind::Rook
+                                                | ChessPieceKind::Bishop
+                                                | ChessPieceKind::Queen = piece.kind
+                                                {
+                                                    return true;
+                                                }
+                                            }
+                                            false
+                                        })
+                                    {
+                                        if let Some(threats) = board.get_threatened_tiles(
+                                            potential_attacker.x,
+                                            potential_attacker.y,
+                                        ) {
+                                            if threats
+                                                .between(
+                                                    BoardPos {
+                                                        x: king.x,
+                                                        y: king.y,
+                                                    },
+                                                    BoardPos {
+                                                        x: potential_attacker.x,
+                                                        y: potential_attacker.y,
+                                                    },
+                                                )
+                                                .contains(&BoardPos {
+                                                    x: piece.x,
+                                                    y: piece.y,
+                                                })
+                                            {
+                                                moves.clear();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        click_ev.send(BoardClickEvent {
+                            tile: tile_pos,
+                            moves,
+                        });
+                    } else {
+                        click_ev.send(BoardClickEvent::default());
                     }
-                    let moves = board.get_moves(tile_pos.x, tile_pos.y);
-                    click_ev.send(BoardClickEvent {
-                        tile: tile_pos,
-                        moves,
-                    });
                 } else if let Ok(selected_tile) = tile_selected_q.get_single() {
                     history.0.push(board.clone());
                     board._move(selected_tile.x, selected_tile.y, tile_pos.x, tile_pos.y);
                     is_black_turn.0 = !is_black_turn.0;
                     click_ev.send(BoardClickEvent::default());
 
-                    if let Some(king) = board.iter().find_map(|piece| {
-                        piece.and_then(|piece| {
-                            if let ChessPieceKind::King = piece.kind {
-                                if std::mem::discriminant(&piece.colour)
-                                    != std::mem::discriminant(
-                                        &board.get(tile_pos.x, tile_pos.y).unwrap().colour,
-                                    )
-                                {
-                                    return Some(piece);
-                                }
-                            }
-                            None
-                        })
-                    }) {
-                        if let Some(threats) = board.get_threatened_tiles(tile_pos.x, tile_pos.y) {
-                            if threats.contains(&BoardPos {
-                                x: king.x,
-                                y: king.y,
-                            }) {
-                                check_ev.send(CheckEvent(Some(TilePos::new(king.x, king.y))));
-                            } else {
-                                check_ev.send(CheckEvent::default());
-                            }
+                    // did that move cause a check?
+                    let mut check: Option<ChessPieceColour> = None;
+                    if let Some(king) = board.find_piece(
+                        ChessPieceKind::King,
+                        !board.get(tile_pos.x, tile_pos.y).unwrap().colour,
+                    ) {
+                        if !board.get_king_attackers(king.colour).is_empty() {
+                            check_ev.send(CheckEvent(Some(TilePos::new(king.x, king.y))));
+                            check = Some(king.colour);
+                        } else {
+                            check_ev.send(CheckEvent::default());
                         }
                     }
+                    board.check = check;
                 }
             }
         }
@@ -149,7 +246,7 @@ impl PartialEq<BoardPos> for Move {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct BoardPos {
     x: u32,
     y: u32,
@@ -158,6 +255,39 @@ pub struct BoardPos {
 impl PartialEq<Move> for BoardPos {
     fn eq(&self, other: &Move) -> bool {
         self.x == other.x && self.y == other.y
+    }
+}
+
+trait Between {
+    fn between(&self, pos1: BoardPos, pos2: BoardPos) -> Self;
+}
+
+impl Between for HashSet<BoardPos> {
+    // returns the set of tiles that are in a straight line between pos1 and pos2
+    fn between(&self, pos1: BoardPos, pos2: BoardPos) -> Self {
+        let mut between = HashSet::new();
+
+        let x_diff = pos1.x as i32 - pos2.x as i32;
+        let y_diff = pos1.y as i32 - pos2.y as i32;
+        if x_diff.abs() != y_diff.abs() && x_diff != 0 && y_diff != 0 {
+            return between;
+        }
+        let x_offset = x_diff.clamp(-1, 1);
+        let y_offset = y_diff.clamp(-1, 1);
+        let mut next_pos = BoardPos {
+            x: (pos1.x as i32 - x_offset) as u32,
+            y: (pos1.y as i32 - y_offset) as u32,
+        };
+        while self.contains(&next_pos) {
+            between.insert(next_pos);
+
+            next_pos = BoardPos {
+                x: (next_pos.x as i32 - x_offset) as u32,
+                y: (next_pos.y as i32 - y_offset) as u32,
+            };
+        }
+
+        between
     }
 }
 

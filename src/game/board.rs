@@ -9,6 +9,7 @@ use crate::game::{BoardPos, Move, MoveFromTo};
 pub struct Board {
     pub(crate) board: Vec<Vec<Option<ChessPiece>>>,
     pub(crate) last_move: Option<MoveFromTo>,
+    pub check: Option<ChessPieceColour>,
 }
 
 impl Default for Board {
@@ -69,6 +70,7 @@ impl Board {
                 vec![None, None, None, None, None, None, None, None],
             ],
             last_move: None,
+            check: None,
         }
     }
 
@@ -453,10 +455,7 @@ impl Board {
                 let mut next_tile = self.get(potential_x as u32, y);
                 loop {
                     if let Some(piece) = next_tile {
-                        if std::mem::discriminant(&piece.colour) == std::mem::discriminant(colour)
-                            || std::mem::discriminant(&piece.kind)
-                                != std::mem::discriminant(&ChessPieceKind::King)
-                        {
+                        if &piece.colour == colour || piece.kind != ChessPieceKind::King {
                             break;
                         }
                     }
@@ -485,10 +484,7 @@ impl Board {
                 let mut next_tile = self.get(x, potential_y as u32);
                 loop {
                     if let Some(piece) = next_tile {
-                        if std::mem::discriminant(&piece.colour) == std::mem::discriminant(colour)
-                            || std::mem::discriminant(&piece.kind)
-                                != std::mem::discriminant(&ChessPieceKind::King)
-                        {
+                        if &piece.colour == colour || piece.kind != ChessPieceKind::King {
                             break;
                         }
                     }
@@ -524,10 +520,7 @@ impl Board {
                 let mut next_tile = self.get(potential_x as u32, potential_y as u32);
                 loop {
                     if let Some(piece) = next_tile {
-                        if std::mem::discriminant(&piece.colour) == std::mem::discriminant(colour)
-                            || std::mem::discriminant(&piece.kind)
-                                != std::mem::discriminant(&ChessPieceKind::King)
-                        {
+                        if &piece.colour == colour || piece.kind != ChessPieceKind::King {
                             break;
                         }
                     }
@@ -626,6 +619,47 @@ impl Board {
             iter = Box::new(iter.chain(row.iter().map(|el| el.as_ref())));
         }
         iter
+    }
+
+    pub fn find_piece(
+        &self,
+        kind: ChessPieceKind,
+        colour: ChessPieceColour,
+    ) -> Option<&ChessPiece> {
+        self.iter().find_map(|piece| {
+            piece.and_then(|piece| {
+                if kind == piece.kind && colour == piece.colour {
+                    return Some(piece);
+                }
+                None
+            })
+        })
+    }
+
+    pub fn get_king_attackers(&self, colour: ChessPieceColour) -> Vec<&ChessPiece> {
+        let mut attackers = Vec::new();
+
+        if let Some(king) = self.find_piece(ChessPieceKind::King, colour) {
+            for piece in self.iter().filter_map(|piece| {
+                piece.and_then(|piece| {
+                    if piece.colour != king.colour {
+                        if let Some(threats) = self.get_threatened_tiles(piece.x, piece.y) {
+                            if threats.contains(&BoardPos {
+                                x: king.x,
+                                y: king.y,
+                            }) {
+                                return Some(piece);
+                            }
+                        }
+                    }
+                    None
+                })
+            }) {
+                attackers.push(piece);
+            }
+        }
+
+        attackers
     }
 }
 
